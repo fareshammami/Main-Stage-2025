@@ -1,1 +1,168 @@
 # Main-Stage-2025
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.1.3</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>com.soft.labs.dev</groupId>
+    <artifactId>cqrs-es</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <name>cqrs-es</name>
+    <description>Demo project for Spring Boot</description>
+
+    <properties>
+        <java.version>17</java.version>
+        <springdoc.version>2.0.2</springdoc.version>
+        <spring-boot.version>3.1.3</spring-boot.version>
+        <axon.version>4.8.0</axon.version>
+        <grpc.version>1.44.1</grpc.version>
+    </properties>
+
+    <dependencies>
+        <!-- Spring Boot Starters -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+            <exclusions>
+                <exclusion>
+                    <groupId>javax.validation</groupId>
+                    <artifactId>validation-api</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- Spring OpenAPI / Swagger -->
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <version>${springdoc.version}</version>
+        </dependency>
+
+        <!-- Axon Framework -->
+        <dependency>
+            <groupId>org.axonframework</groupId>
+            <artifactId>axon-spring-boot-starter</artifactId>
+            <version>${axon.version}</version>
+        </dependency>
+<!--        <dependency>-->
+<!--            <groupId>io.axoniq</groupId>-->
+<!--            <artifactId>axonserver-connector-java</artifactId>-->
+<!--            <version>4.8.0</version> &lt;!&ndash; Updated to match Axon 4.8.2 version &ndash;&gt;-->
+<!--            <exclusions>-->
+<!--                <exclusion>-->
+<!--                    <groupId>io.grpc</groupId>-->
+<!--                    <artifactId>grpc-core</artifactId>-->
+<!--                </exclusion>-->
+<!--                <exclusion>-->
+<!--                    <groupId>io.grpc</groupId>-->
+<!--                    <artifactId>grpc-netty</artifactId>-->
+<!--                </exclusion>-->
+<!--            </exclusions>-->
+<!--        </dependency>-->
+        <dependency>
+            <groupId>io.axoniq.inspector</groupId>
+            <artifactId>inspector-axon-spring-boot-starter</artifactId>
+            <version>0.1.9</version>
+        </dependency>
+
+        <!-- EventStoreDB (Updated version) -->
+        <dependency>
+            <groupId>com.eventstore</groupId>
+            <artifactId>db-client-java</artifactId>
+            <version>5.3.0</version> <!-- Ensure compatibility with your setup -->
+            <exclusions>
+                <exclusion>
+                    <groupId>io.grpc</groupId>
+                    <artifactId>grpc-core</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>io.grpc</groupId>
+                    <artifactId>grpc-netty-shaded</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <!-- MongoDB Support -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-mongodb</artifactId>
+        </dependency>
+
+        <!-- Fix gRPC Version Conflict -->
+        <dependency>
+            <groupId>io.grpc</groupId>
+            <artifactId>grpc-core</artifactId>
+            <version>${grpc.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.grpc</groupId>
+            <artifactId>grpc-netty</artifactId>
+            <version>${grpc.version}</version>
+        </dependency>
+
+        <!-- Spring Boot Properties Migrator -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-properties-migrator</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- Spring Boot Starter Test -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Axon Test Support -->
+        <dependency>
+            <groupId>org.axonframework</groupId>
+            <artifactId>axon-test</artifactId>
+            <version>${axon.version}</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <repositories>
+        <repository>
+            <id>github</id>
+            <url>https://maven.pkg.github.com/EventStore/EventStore-Client-Java</url>
+            <snapshots>
+                <enabled>true</enabled>
+            </snapshots>
+        </repository>
+    </repositories>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>
