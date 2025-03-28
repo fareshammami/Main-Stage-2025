@@ -1,33 +1,35 @@
-version: '3.8'
+server:
+  port: 8080
 
-services:
-  axon-server:
-    image: axoniq/axonserver
-    container_name: axon-server
-    hostname: axonserver
-    environment:
-      - AXONIQ_AXONSERVER_DEVMODE_ENABLED=true
-    ports:
-      - 8024:8024
-      - 8124:8124
-  eventstore.db:
-    image: eventstore/eventstore:21.2.0-buster-slim
-    environment:
-      - EVENTSTORE_CLUSTER_SIZE=1
-      - EVENTSTORE_RUN_PROJECTIONS=System
-      - EVENTSTORE_START_STANDARD_PROJECTIONS=true
-      - EVENTSTORE_EXT_TCP_PORT=1113
-      - EVENTSTORE_EXT_HTTP_PORT=2113
-      - EVENTSTORE_INSECURE=true
-      - EVENTSTORE_ENABLE_EXTERNAL_TCP=true
-      - EVENTSTORE_ENABLE_ATOM_PUB_OVER_HTTP=true
-    ports:
-      - "1113:1113"
-      - "2113:2113"
-  mongodb:
-    image: mongo
-    container_name: dewdrop-mongodb
-    ports:
-      - "27017:27017"
-    environment:
-      MONGO_INITDB_DATABASE: dewdrop_db2
+spring:
+  # MongoDB Configuration (Main Database)
+  data:
+    mongodb:
+      host: localhost
+      port: 27017
+      database: dewdrop_db2
+      auto-index-creation: true
+
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
+      - org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration
+
+axon:
+  axonserver:
+    enabled: false  # Disable Axon Server
+
+  serializer:
+    general: jackson
+    events: jackson
+    messages: jackson
+  eventhandling:
+    processors:
+      asyncProcessor:
+        mode: subscribing
+        source: eventStore
+  eventstore:
+    eventStoreDB:
+      uri: esdb://localhost:2113?tls=false  # EventStoreDB connection string
+  aggregate:
+    snapshot-threshold: 10  # Enables snapshotting after 10 events

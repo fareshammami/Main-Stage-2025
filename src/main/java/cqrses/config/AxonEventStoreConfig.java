@@ -1,14 +1,19 @@
 package cqrses.config;
 
 import com.eventstore.dbclient.*;
+import org.axonframework.commandhandling.CommandBus;
+import org.axonframework.commandhandling.SimpleCommandBus;
 import org.axonframework.commandhandling.gateway.CommandGateway;
-import org.axonframework.config.DefaultConfigurer;
+import org.axonframework.commandhandling.gateway.DefaultCommandGateway;
+import org.axonframework.config.Configurer;
 import org.axonframework.eventsourcing.eventstore.*;
 import org.axonframework.serialization.Serializer;
 import org.axonframework.serialization.json.JacksonSerializer;
 import org.axonframework.spring.eventsourcing.SpringAggregateSnapshotter;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 
 @Configuration
 public class AxonEventStoreConfig {
@@ -19,12 +24,7 @@ public class AxonEventStoreConfig {
     }
 
     @Bean
-    public Serializer eventSerializer() {
-        return JacksonSerializer.defaultSerializer();
-    }
-
-    @Bean
-    public EventStorageEngine eventStorageEngine(EventStoreDBClient client, Serializer serializer) {
+    public EventStorageEngine eventStorageEngine(EventStoreDBClient client, @Qualifier("eventSerializer") Serializer serializer) {
         return new CustomEventStoreDBStorageEngine(client, serializer);
     }
 
@@ -34,8 +34,22 @@ public class AxonEventStoreConfig {
     }
 
     @Bean
-    public SpringAggregateSnapshotter snapshotter() {
-        return SpringAggregateSnapshotter.builder().build();
+    public SpringAggregateSnapshotter snapshotter(EventStore eventStore) {
+        return SpringAggregateSnapshotter.builder()
+                .eventStore(eventStore)
+                .executor(Runnable::run)
+                .build();
     }
 
+    @Bean
+    public CommandBus commandBus() {
+        return SimpleCommandBus.builder().build();
+    }
+
+    @Bean
+    public CommandGateway commandGateway(CommandBus commandBus) {
+        return DefaultCommandGateway.builder()
+                .commandBus(commandBus)
+                .build();
+    }
 }

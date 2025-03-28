@@ -28,5 +28,4 @@ public class EventAggregate {
         this.id = event.getId();
         this.data = event.getData();
     }
-
 }
