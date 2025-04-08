@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 @RestController
@@ -19,5 +20,16 @@ public class EventController {
     public CompletableFuture<ResponseEntity<String>> createEvent(@RequestBody CreateEventCommand command) {
         return eventService.createEvent(command.getId(), command.getData())
                 .thenApply(result -> ResponseEntity.ok("Event created with ID: " + result));
+    }
+    @GetMapping("/stream/{streamId}")
+    public ResponseEntity<List<String>> getEventsFromStream(@PathVariable String streamId) {
+        try {
+            // Retrieve events using the streamId
+            List<String> events = eventService.getEventsFromEventStore(streamId);
+            return ResponseEntity.ok(events);
+        } catch (Exception e) {
+            // In case of error, send an internal server error response
+            return ResponseEntity.internalServerError().body(List.of("Error retrieving events: " + e.getMessage()));
+        }
     }
 }
