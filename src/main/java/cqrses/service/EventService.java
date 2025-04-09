@@ -29,7 +29,7 @@ public class EventService {
         ReadResult result = eventStoreDBClient.readStream(streamId, options).get();
 
         return result.getEvents().stream()
-                .map(e -> e.getEvent().getEventData().toString()) // Convert event data to string
+                .map(e -> new String(e.getEvent().getEventData())) //
                 .collect(Collectors.toList());
     }
 

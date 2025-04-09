@@ -24,14 +24,25 @@ public class CustomEventStoreDBStorageEngine extends AbstractEventStorageEngine 
     @Override
     protected void appendEvents(List<? extends EventMessage<?>> events, Serializer serializer) {
         events.forEach(event -> {
-            byte[] payload = serializer.serialize(event.getPayload(), byte[].class).getData();
-            byte[] metadata = serializer.serialize(event.getMetaData(), byte[].class).getData();
+            //  Cast vers DomainEventMessage pour avoir access au aggregateIdentifier
+            if (event instanceof DomainEventMessage<?>) {
+                DomainEventMessage<?> domainEvent = (DomainEventMessage<?>) event;
 
-            EventData eventData = EventData.builderAsBinary(event.getPayloadType().getSimpleName(), payload)
-                    .metadataAsBytes(metadata)
-                    .build();
+                byte[] payload = serializer.serialize(domainEvent.getPayload(), byte[].class).getData();
+                byte[] metadata = serializer.serialize(domainEvent.getMetaData(), byte[].class).getData();
 
-            client.appendToStream(event.getIdentifier(), eventData).join();
+                // Nom du stream cohérent basé sur le type + aggregateId
+                String streamName = domainEvent.getType() + "-" + domainEvent.getAggregateIdentifier();
+
+                String jsonPayload = new String(payload); // le payload a déjà été encodé en JSON par le serializer
+                String jsonMetadata = new String(metadata);
+
+                EventData eventData = EventData.builderAsJson(domainEvent.getPayloadType().getSimpleName(), jsonPayload)
+                        .metadataAsJson(jsonMetadata)
+                        .build();
+
+                client.appendToStream(streamName, eventData).join();
+            }
         });
     }
 
@@ -51,13 +62,22 @@ public class CustomEventStoreDBStorageEngine extends AbstractEventStorageEngine 
 
     @Override
     protected void storeSnapshot(DomainEventMessage<?> snapshot, Serializer serializer) {
-        byte[] snapshotData = serializer.serialize(snapshot.getPayload(), byte[].class).getData();
+        byte[] payloadBytes = serializer.serialize(snapshot.getPayload(), byte[].class).getData();
+        byte[] metadataBytes = serializer.serialize(snapshot.getMetaData(), byte[].class).getData();
 
-        EventData eventData = EventData.builderAsBinary(snapshot.getPayloadType().getSimpleName(), snapshotData)
-                .metadataAsBytes(serializer.serialize(snapshot.getMetaData(), byte[].class).getData())
+        String payload = new String(payloadBytes);
+        String metadata = new String(metadataBytes);
+
+        EventData eventData = EventData.builderAsJson(
+                        snapshot.getPayloadType().getSimpleName(),
+                        payload
+                )
+                .metadataAsJson(metadata)
                 .build();
 
-        client.appendToStream(snapshot.getAggregateIdentifier() + "-snapshot", eventData).join();
+        String streamName = "EventAggregate-" + snapshot.getAggregateIdentifier() + "-snapshot";
+
+        client.appendToStream(streamName, eventData).join();
     }
 
     @Override

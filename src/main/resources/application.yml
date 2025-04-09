@@ -23,6 +23,7 @@ axon:
     general: jackson
     events: jackson
     messages: jackson
+
   eventhandling:
     processors:
       asyncProcessor:
