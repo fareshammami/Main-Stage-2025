@@ -2,10 +2,16 @@ package cqrses.config;
 
 import com.eventstore.dbclient.*;
 import com.eventstore.dbclient.EventData;
+import cqrses.event.CreateEvent;
+import cqrses.event.UpdateEvent;
 import org.axonframework.eventhandling.*;
 import org.axonframework.eventsourcing.eventstore.*;
+import org.axonframework.serialization.SerializedObject;
 import org.axonframework.serialization.Serializer;
+import org.axonframework.serialization.SimpleSerializedObject;
+import org.axonframework.serialization.SimpleSerializedType;
 import org.axonframework.serialization.json.JacksonSerializer;
+import java.util.concurrent.atomic.AtomicLong;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -24,22 +30,20 @@ public class CustomEventStoreDBStorageEngine extends AbstractEventStorageEngine 
     @Override
     protected void appendEvents(List<? extends EventMessage<?>> events, Serializer serializer) {
         events.forEach(event -> {
-            //  Cast vers DomainEventMessage pour avoir access au aggregateIdentifier
-            if (event instanceof DomainEventMessage<?>) {
-                DomainEventMessage<?> domainEvent = (DomainEventMessage<?>) event;
+            if (event instanceof DomainEventMessage<?> domainEvent) {
 
-                byte[] payload = serializer.serialize(domainEvent.getPayload(), byte[].class).getData();
-                byte[] metadata = serializer.serialize(domainEvent.getMetaData(), byte[].class).getData();
+                String jsonPayload = serializer.serialize(domainEvent.getPayload(), String.class).getData();
+                String jsonMetadata = serializer.serialize(domainEvent.getMetaData(), String.class).getData();
 
-                // Nom du stream cohérent basé sur le type + aggregateId
+
                 String streamName = domainEvent.getType() + "-" + domainEvent.getAggregateIdentifier();
 
-                String jsonPayload = new String(payload); // le payload a déjà été encodé en JSON par le serializer
-                String jsonMetadata = new String(metadata);
 
-                EventData eventData = EventData.builderAsJson(domainEvent.getPayloadType().getSimpleName(), jsonPayload)
-                        .metadataAsJson(jsonMetadata)
-                        .build();
+                EventData eventData = EventData.builderAsJson(
+                        domainEvent.getPayloadType().getSimpleName(),  // e.g. "CreateEvent"
+                        jsonPayload
+                ).metadataAsJson(jsonMetadata).build();
+
 
                 client.appendToStream(streamName, eventData).join();
             }
@@ -48,16 +52,38 @@ public class CustomEventStoreDBStorageEngine extends AbstractEventStorageEngine 
 
     @Override
     public DomainEventStream readEvents(String aggregateIdentifier) {
-        ReadStreamOptions options = ReadStreamOptions.get().forwards().fromStart();
-        ReadResult result = client.readStream(aggregateIdentifier, options).join();
+        String streamName = "EventAggregate-" + aggregateIdentifier;
 
-        Stream<ResolvedEvent> events = result.getEvents().stream();
-        return DomainEventStream.of(events.map(event -> new GenericDomainEventMessage<>(
-                event.getEvent().getEventType(),
-                aggregateIdentifier,
-                event.getEvent().getRevision(),
-                event.getEvent().getEventData()
-        )));
+        ReadResult result = client.readStream(streamName, ReadStreamOptions.get().forwards().fromStart()).join();
+
+        AtomicLong sequence = new AtomicLong(0);
+
+        return DomainEventStream.of(result.getEvents().stream().map(resolved -> {
+            RecordedEvent re = resolved.getEvent();
+
+            // Déduire la classe d'événement
+            Class<?> eventClass = switch (re.getEventType()) {
+                case "CreateEvent" -> CreateEvent.class;
+                case "UpdateEvent" -> UpdateEvent.class;
+                default -> throw new RuntimeException("Unknown event: " + re.getEventType());
+            };
+
+            // Préparer un objet sérialisé
+            SerializedObject<byte[]> serializedObject = new SimpleSerializedObject<>(
+                    re.getEventData(), byte[].class, new SimpleSerializedType(eventClass.getName(), null)
+            );
+
+            // Désérialisation avec Axon Serializer
+            Object payload = serializer.deserialize(serializedObject);
+
+            // Création de l'événement domain Axon
+            return new GenericDomainEventMessage<>(
+                    re.getEventType(),
+                    aggregateIdentifier,
+                    sequence.getAndIncrement(),
+                    payload
+            );
+        }));
     }
 
     @Override

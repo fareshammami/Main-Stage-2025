@@ -1,6 +1,7 @@
 package cqrses.rest;
 
 import cqrses.command.CreateEventCommand;
+import cqrses.command.UpdateEventCommand;
 import cqrses.service.EventService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -32,4 +33,10 @@ public class EventController {
             return ResponseEntity.internalServerError().body(List.of("Error retrieving events: " + e.getMessage()));
         }
     }
+    @PostMapping("/update")
+    public CompletableFuture<ResponseEntity<String>> updateEvent(@RequestBody UpdateEventCommand command) {
+        return eventService.updateEvent(command.getId(), command.getNewMessage())
+                .thenApply(result -> ResponseEntity.ok("Event updated: " + result));
+    }
+
 }

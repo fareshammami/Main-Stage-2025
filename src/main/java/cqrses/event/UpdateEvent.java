@@ -1,4 +1,4 @@
-package cqrses.entity;
+package cqrses.event;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -7,7 +7,7 @@ import lombok.NoArgsConstructor;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-public class event {
+public class UpdateEvent {
     private String id;
-    private String message;
+    private String newMessage;
 }

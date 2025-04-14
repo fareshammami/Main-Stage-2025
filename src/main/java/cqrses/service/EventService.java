@@ -4,6 +4,7 @@ import com.eventstore.dbclient.EventStoreDBClient;
 import com.eventstore.dbclient.ReadResult;
 import com.eventstore.dbclient.ReadStreamOptions;
 import cqrses.command.CreateEventCommand;
+import cqrses.command.UpdateEventCommand;
 import lombok.RequiredArgsConstructor;
 import org.axonframework.commandhandling.gateway.CommandGateway;
 import org.springframework.stereotype.Service;
@@ -32,5 +33,10 @@ public class EventService {
                 .map(e -> new String(e.getEvent().getEventData())) //
                 .collect(Collectors.toList());
     }
+
+    public CompletableFuture<String> updateEvent(String id, String newMessage) {
+        return commandGateway.send(new UpdateEventCommand(id, newMessage));
+    }
+
 
 }
