@@ -27,6 +27,11 @@ public class CustomEventStoreDBStorageEngine extends AbstractEventStorageEngine 
         this.serializer = serializer;
     }
 
+    private String getStreamName(String aggregateId) {
+        return "EventAggregate-" + aggregateId;
+    }
+
+
     @Override
     protected void appendEvents(List<? extends EventMessage<?>> events, Serializer serializer) {
         events.forEach(event -> {
@@ -35,15 +40,18 @@ public class CustomEventStoreDBStorageEngine extends AbstractEventStorageEngine 
                 String jsonPayload = serializer.serialize(domainEvent.getPayload(), String.class).getData();
                 String jsonMetadata = serializer.serialize(domainEvent.getMetaData(), String.class).getData();
 
+                String streamName = getStreamName(domainEvent.getAggregateIdentifier());
 
-                String streamName = domainEvent.getType() + "-" + domainEvent.getAggregateIdentifier();
 
+                System.out.println(" Writing to stream: " + streamName);
+                System.out.println(" Event type: " + domainEvent.getPayloadType().getSimpleName());
+                System.out.println(" Payload: " + jsonPayload);
+                System.out.println(" Metadata: " + jsonMetadata);
 
                 EventData eventData = EventData.builderAsJson(
-                        domainEvent.getPayloadType().getSimpleName(),  // e.g. "CreateEvent"
+                        domainEvent.getPayloadType().getSimpleName(),
                         jsonPayload
                 ).metadataAsJson(jsonMetadata).build();
-
 
                 client.appendToStream(streamName, eventData).join();
             }
@@ -52,7 +60,10 @@ public class CustomEventStoreDBStorageEngine extends AbstractEventStorageEngine 
 
     @Override
     public DomainEventStream readEvents(String aggregateIdentifier) {
-        String streamName = "EventAggregate-" + aggregateIdentifier;
+        String streamName = getStreamName(aggregateIdentifier);
+
+
+        System.out.println(" Reading stream: " + streamName);
 
         ReadResult result = client.readStream(streamName, ReadStreamOptions.get().forwards().fromStart()).join();
 
@@ -61,22 +72,21 @@ public class CustomEventStoreDBStorageEngine extends AbstractEventStorageEngine 
         return DomainEventStream.of(result.getEvents().stream().map(resolved -> {
             RecordedEvent re = resolved.getEvent();
 
-            // Déduire la classe d'événement
+            //  LOG AJOUTÉ
+            System.out.println(" Event found: " + re.getEventType());
+
             Class<?> eventClass = switch (re.getEventType()) {
                 case "CreateEvent" -> CreateEvent.class;
                 case "UpdateEvent" -> UpdateEvent.class;
                 default -> throw new RuntimeException("Unknown event: " + re.getEventType());
             };
 
-            // Préparer un objet sérialisé
             SerializedObject<byte[]> serializedObject = new SimpleSerializedObject<>(
                     re.getEventData(), byte[].class, new SimpleSerializedType(eventClass.getName(), null)
             );
 
-            // Désérialisation avec Axon Serializer
             Object payload = serializer.deserialize(serializedObject);
 
-            // Création de l'événement domain Axon
             return new GenericDomainEventMessage<>(
                     re.getEventType(),
                     aggregateIdentifier,
@@ -85,6 +95,7 @@ public class CustomEventStoreDBStorageEngine extends AbstractEventStorageEngine 
             );
         }));
     }
+
 
     @Override
     protected void storeSnapshot(DomainEventMessage<?> snapshot, Serializer serializer) {
