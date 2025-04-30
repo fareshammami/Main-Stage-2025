@@ -10,14 +10,15 @@ import org.axonframework.serialization.SerializedObject;
 import org.axonframework.serialization.Serializer;
 import org.axonframework.serialization.SimpleSerializedObject;
 import org.axonframework.serialization.SimpleSerializedType;
-import org.axonframework.serialization.json.JacksonSerializer;
-import java.util.concurrent.atomic.AtomicLong;
+import org.axonframework.eventhandling.GenericDomainEventMessage;
 
 import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class CustomEventStoreDBStorageEngine extends AbstractEventStorageEngine {
+
     private final EventStoreDBClient client;
     private final Serializer serializer;
 
@@ -31,27 +32,23 @@ public class CustomEventStoreDBStorageEngine extends AbstractEventStorageEngine 
         return "EventAggregate-" + aggregateId;
     }
 
-
     @Override
-    protected void appendEvents(List<? extends EventMessage<?>> events, Serializer serializer) {
+    protected void appendEvents(List<? extends EventMessage<?>> events, Serializer ignored) {
         events.forEach(event -> {
             if (event instanceof DomainEventMessage<?> domainEvent) {
-
-                String jsonPayload = serializer.serialize(domainEvent.getPayload(), String.class).getData();
-                String jsonMetadata = serializer.serialize(domainEvent.getMetaData(), String.class).getData();
+                // Sérialisation correcte en byte[]
+                SerializedObject<byte[]> serializedPayload = this.serializer.serialize(domainEvent.getPayload(), byte[].class);
+                SerializedObject<byte[]> serializedMetadata = this.serializer.serialize(domainEvent.getMetaData(), byte[].class);
 
                 String streamName = getStreamName(domainEvent.getAggregateIdentifier());
 
-
-                System.out.println(" Writing to stream: " + streamName);
-                System.out.println(" Event type: " + domainEvent.getPayloadType().getSimpleName());
-                System.out.println(" Payload: " + jsonPayload);
-                System.out.println(" Metadata: " + jsonMetadata);
+                System.out.println("📥 Writing to stream: " + streamName);
+                System.out.println("📦 Event type: " + domainEvent.getPayloadType().getSimpleName());
 
                 EventData eventData = EventData.builderAsJson(
                         domainEvent.getPayloadType().getSimpleName(),
-                        jsonPayload
-                ).metadataAsJson(jsonMetadata).build();
+                        serializedPayload.getData()
+                ).metadataAsBytes(serializedMetadata.getData()).build();
 
                 client.appendToStream(streamName, eventData).join();
             }
@@ -61,19 +58,15 @@ public class CustomEventStoreDBStorageEngine extends AbstractEventStorageEngine 
     @Override
     public DomainEventStream readEvents(String aggregateIdentifier) {
         String streamName = getStreamName(aggregateIdentifier);
-
-
-        System.out.println(" Reading stream: " + streamName);
+        System.out.println("📤 Reading stream: " + streamName);
 
         ReadResult result = client.readStream(streamName, ReadStreamOptions.get().forwards().fromStart()).join();
-
         AtomicLong sequence = new AtomicLong(0);
 
         return DomainEventStream.of(result.getEvents().stream().map(resolved -> {
             RecordedEvent re = resolved.getEvent();
 
-            //  LOG AJOUTÉ
-            System.out.println(" Event found: " + re.getEventType());
+            System.out.println("✅ Event found: " + re.getEventType());
 
             Class<?> eventClass = switch (re.getEventType()) {
                 case "CreateEvent" -> CreateEvent.class;
@@ -82,44 +75,42 @@ public class CustomEventStoreDBStorageEngine extends AbstractEventStorageEngine 
             };
 
             SerializedObject<byte[]> serializedObject = new SimpleSerializedObject<>(
-                    re.getEventData(), byte[].class, new SimpleSerializedType(eventClass.getName(), null)
+                    re.getEventData(),
+                    byte[].class,
+                    new SimpleSerializedType(eventClass.getName(), null)
             );
 
             Object payload = serializer.deserialize(serializedObject);
 
             return new GenericDomainEventMessage<>(
-                    re.getEventType(),
-                    aggregateIdentifier,
-                    sequence.getAndIncrement(),
-                    payload
+                    re.getEventType(),              // type
+                    aggregateIdentifier,           // aggregate ID
+                    sequence.getAndIncrement(),    // sequence
+                    payload                        // payload
             );
         }));
     }
 
 
+
+
     @Override
     protected void storeSnapshot(DomainEventMessage<?> snapshot, Serializer serializer) {
-        byte[] payloadBytes = serializer.serialize(snapshot.getPayload(), byte[].class).getData();
-        byte[] metadataBytes = serializer.serialize(snapshot.getMetaData(), byte[].class).getData();
-
-        String payload = new String(payloadBytes);
-        String metadata = new String(metadataBytes);
+        String jsonPayload = serializer.serialize(snapshot.getPayload(), String.class).getData();
+        String jsonMetadata = serializer.serialize(snapshot.getMetaData(), String.class).getData();
 
         EventData eventData = EventData.builderAsJson(
-                        snapshot.getPayloadType().getSimpleName(),
-                        payload
-                )
-                .metadataAsJson(metadata)
-                .build();
+                snapshot.getPayloadType().getSimpleName(),
+                jsonPayload
+        ).metadataAsJson(jsonMetadata).build();
 
-        String streamName = "EventAggregate-" + snapshot.getAggregateIdentifier() + "-snapshot";
-
+        String streamName = getStreamName(snapshot.getAggregateIdentifier()) + "-snapshot";
         client.appendToStream(streamName, eventData).join();
     }
 
     @Override
     protected Stream<? extends DomainEventData<?>> readEventData(String aggregateIdentifier, long firstSequenceNumber) {
-        return Stream.empty(); // Implement this properly for event retrieval.
+        return Stream.empty();
     }
 
     @Override

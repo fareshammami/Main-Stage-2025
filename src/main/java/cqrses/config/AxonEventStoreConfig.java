@@ -24,8 +24,11 @@ public class AxonEventStoreConfig {
     }
 
     @Bean
-    public EventStorageEngine eventStorageEngine(EventStoreDBClient client, @Qualifier("eventSerializer") Serializer serializer) {
-        return new CustomEventStoreDBStorageEngine(client, serializer);
+    public EventStorageEngine eventStorageEngine(EventStoreDBClient client) {
+        return new CustomEventStoreDBStorageEngine(
+                client,
+                JacksonSerializer.defaultSerializer()
+        );
     }
 
     @Bean
@@ -52,4 +55,9 @@ public class AxonEventStoreConfig {
                 .commandBus(commandBus)
                 .build();
     }
+    @Bean
+    public Serializer eventSerializer() {
+        return JacksonSerializer.defaultSerializer();
+    }
+
 }
