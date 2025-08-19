@@ -21,19 +21,20 @@ import static org.axonframework.modelling.command.AggregateLifecycle.apply;
 public class InduErrorAggregate {
 
     @AggregateIdentifier
-    private String groupId;
+    private String userId;
 
     private Set<String> handledErrors = new HashSet<>();
-
+    private Set<String> handledCompensations = new HashSet<>();
     @CommandHandler
     public InduErrorAggregate(CreateInduErrorCommand command) {
-        apply(new InduGroupCreatedEvent(command.getGroupId()));
+        apply(new InduGroupCreatedEvent(command.getUserId()));
     }
 
     @CommandHandler
     public void handle(AddInduErrorCommand command) {
         apply(new InduErrorCreatedEvent(
                 UUID.randomUUID().toString(),
+                command.getUserId(),
                 command.getAmount(),
                 InduErrorStatus.NOT_TRAITED
         ));
@@ -51,7 +52,7 @@ public class InduErrorAggregate {
     @CommandHandler
     public void handle(ProcessInduErrorsCommand command) {
         apply(new InduErrorCurrentStateEvent(
-                command.getGroupId(),
+                command.getUserId(),
                 command.getTotalUntreatedAmount()
         ));
     }
@@ -59,21 +60,23 @@ public class InduErrorAggregate {
     public void handle(AddCompensationCommand command) {
         apply(new CompensationCreatedEvent(
                 UUID.randomUUID().toString(),
+                command.getUserId(),
                 command.getAmount(),
                 CompensationStatus.NOT_TRAITED
         ));
     }
     @CommandHandler
     public void handle(HandleCompensationCommand command) {
-        apply(new CompensationHandledEvent(
-                command.getCompensationId(),
-                CompensationStatus.TRAITED
-        ));
+        if (!handledCompensations.contains(command.getCompensationId())) {
+            apply(new CompensationHandledEvent(
+                    command.getCompensationId(),
+                    CompensationStatus.TRAITED
+            ));
+        }
     }
-
     @EventSourcingHandler
     public void on(InduGroupCreatedEvent event) {
-        this.groupId = event.getGroupId();
+        this.userId = event.getUserId();
     }
 
     @EventSourcingHandler
@@ -88,7 +91,7 @@ public class InduErrorAggregate {
 
     @EventSourcingHandler
     public void on(InduErrorCurrentStateEvent event) {
-        System.out.println("📊 Current untreated amount for group " + event.getGroupId() + ": " + event.getTotalUntreatedAmount());
+        System.out.println("📊 Current untreated amount for group " + event.getUserId() + ": " + event.getTotalUntreatedAmount());
         // Optionally, store the amount if needed
     }
 
@@ -98,7 +101,7 @@ public class InduErrorAggregate {
     }
     @EventSourcingHandler
     public void on(CompensationHandledEvent event) {
-        // Log or track handled compensations if needed
+        handledCompensations.add(event.getCompensationId());
         System.out.println("✅ Compensation traitée : " + event.getCompensationId());
     }
 }

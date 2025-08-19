@@ -10,6 +10,6 @@ import org.axonframework.modelling.command.TargetAggregateIdentifier;
 @NoArgsConstructor
 public class ProcessInduErrorsCommand {
     @TargetAggregateIdentifier
-    private String groupId;
+    private String userId;
     private Double totalUntreatedAmount;
 }

@@ -10,7 +10,7 @@ import org.axonframework.modelling.command.TargetAggregateIdentifier;
 @NoArgsConstructor
 public class HandleCompensationCommand {
     @TargetAggregateIdentifier
-    private String groupId;
+    private String userId;
     private String compensationId;
     private Double amount;
 }

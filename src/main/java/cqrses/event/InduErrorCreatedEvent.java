@@ -10,6 +10,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class InduErrorCreatedEvent {
     private String induErrorId;
+    private String userId;
     private Double amount;
     private InduErrorStatus status;
 }

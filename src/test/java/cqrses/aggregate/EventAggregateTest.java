@@ -1,9 +1,5 @@
 package cqrses.aggregate;
 
-import cqrses.command.CreateEventCommand;
-import cqrses.command.UpdateEventCommand;
-import cqrses.event.CreateEvent;
-import cqrses.event.UpdateEvent;
 import org.axonframework.test.aggregate.AggregateTestFixture;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

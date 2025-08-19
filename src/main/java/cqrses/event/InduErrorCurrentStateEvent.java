@@ -8,6 +8,6 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 public class InduErrorCurrentStateEvent {
-    private String groupId;
+    private String userId;
     private Double totalUntreatedAmount;
 }

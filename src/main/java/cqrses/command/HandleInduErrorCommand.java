@@ -8,7 +8,7 @@ import org.axonframework.modelling.command.TargetAggregateIdentifier;
 @NoArgsConstructor
 public class HandleInduErrorCommand {
     @TargetAggregateIdentifier
-    private String groupId;
+    private String userId;
     private String induErrorId;
     private Double amount;
 }

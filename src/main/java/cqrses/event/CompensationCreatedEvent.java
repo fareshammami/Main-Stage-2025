@@ -10,6 +10,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class CompensationCreatedEvent {
     private String compensationId;
+    private String userId;
     private Double amount;
     private CompensationStatus status;
 }

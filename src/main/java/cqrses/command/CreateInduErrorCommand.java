@@ -10,5 +10,5 @@ import org.axonframework.modelling.command.TargetAggregateIdentifier;
 @NoArgsConstructor
 public class CreateInduErrorCommand {
     @TargetAggregateIdentifier
-    private String groupId;
+    private String userId;
 }

@@ -10,11 +10,17 @@
     import org.axonframework.serialization.SimpleSerializedObject;
     import org.axonframework.serialization.SimpleSerializedType;
     import org.axonframework.eventhandling.GenericDomainEventMessage;
+    import org.springframework.context.annotation.Bean;
+    import org.springframework.context.annotation.Primary;
+    import org.springframework.stereotype.Component;
 
+    import java.util.Comparator;
     import java.util.List;
     import java.util.concurrent.atomic.AtomicLong;
     import java.util.stream.Collectors;
     import java.util.stream.Stream;
+    @Primary
+    @Component
 
     public class CustomEventStoreDBStorageEngine extends AbstractEventStorageEngine {
 
@@ -68,8 +74,6 @@
                 System.out.println("✅ Event found: " + re.getEventType());
 
                 Class<?> eventClass = switch (re.getEventType()) {
-                    case "CreateEvent" -> CreateEvent.class;
-                    case "UpdateEvent" -> UpdateEvent.class;
                     case "InduErrorCreatedEvent" -> InduErrorCreatedEvent.class;
                     case "InduErrorHandledEvent" -> InduErrorHandledEvent.class;
                     case "InduCreatedEvent" -> InduCreatedEvent.class;
@@ -113,7 +117,26 @@
             String streamName = getStreamName(snapshot.getAggregateIdentifier()) + "-snapshot";
             client.appendToStream(streamName, eventData).join();
         }
+        public Double getLastInduErrorAmount(String userId) {
+            try {
+                // Read all events for the given user (aggregate)
+                List<InduErrorCurrentStateEvent> events = this.readEvents(userId).asStream()
+                        .map(eventMessage -> eventMessage.getPayload()) // payload is the actual event object
+                        .filter(payload -> payload instanceof InduErrorCurrentStateEvent)
+                        .map(payload -> (InduErrorCurrentStateEvent) payload)
+                        .collect(Collectors.toList());
 
+                if (!events.isEmpty()) {
+                    // Take the last event in the list
+                    return events.get(events.size() - 1).getTotalUntreatedAmount();
+                }
+                return null; // no events, return null
+            } catch (Exception e) {
+                // Any error while reading events, just return null
+                System.err.println("Failed to read events for user " + userId + ": " + e.getMessage());
+                return null;
+            }
+        }
         @Override
         protected Stream<? extends DomainEventData<?>> readEventData(String aggregateIdentifier, long firstSequenceNumber) {
             return Stream.empty();

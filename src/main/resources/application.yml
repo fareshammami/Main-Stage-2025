@@ -2,7 +2,6 @@ server:
   port: 8080
 
 spring:
-  # MongoDB Configuration (Main Database)
   data:
     mongodb:
       host: localhost
@@ -14,10 +13,28 @@ spring:
     exclude:
       - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
       - org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration
-
+      -
+  security:
+    oauth2:
+      client:
+        registration:
+          keycloak:
+            client-id: springboot-backendC
+            client-secret: L7YdxkgryRCUSv8cXMmM94FHZ5AKz8YE
+            authorization-grant-type: client_credentials
+            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
+            scope: openid, profile, email
+        provider:
+          keycloak:
+            issuer-uri: http://localhost:8081/realms/MainStageRealm
+            token-uri: http://localhost:8081/realms/MainStageRealm/protocol/openid-connect/token
+            authorization-uri: http://localhost:8081/realms/MainStageRealm/protocol/openid-connect/auth
+            user-info-uri: http://localhost:8081/realms/MainStageRealm/protocol/openid-connect/userinfo
+            jwk-set-uri: http://localhost:8081/realms/MainStageRealm/protocol/openid-connect/certs
+            user-name-attribute: preferred_username
 axon:
   axonserver:
-    enabled: false  # Disable Axon Server
+    enabled: false
 
   serializer:
     general: jackson
@@ -26,11 +43,17 @@ axon:
 
   eventhandling:
     processors:
-      asyncProcessor:
-        mode: subscribing
+      userInduState:           # 👈 Projection group name (matches @ProcessingGroup)
+        mode: tracking         # 👈 Required for Mongo-backed token store
         source: eventStore
+
   eventstore:
     eventStoreDB:
-      uri: esdb://localhost:2113?tls=false  # EventStoreDB connection string
-  aggregate:
-    snapshot-threshold: 10  # Enables snapshotting after 10 events
+      uri: esdb://localhost:2113?tls=false
+
+  mongo:
+    enabled: true             # 👈 Active Axon Mongo token store
+    database-name: dewdrop_db2
+    token-store:
+      collection-name: token_entries  # 👈 default collection used to store tokens
+

@@ -30,8 +30,8 @@
                 <groupId>io.grpc</groupId>
                 <artifactId>grpc-bom</artifactId>
                 <version>${grpc.version}</version>
-                <scope>import</scope>
                 <type>pom</type>
+                <scope>import</scope>
             </dependency>
         </dependencies>
     </dependencyManagement>
@@ -54,21 +54,52 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
+        <!-- Spring Security -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
 
+        <!-- OAuth2 Client (for login with Keycloak / Google / etc.) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-oauth2-client</artifactId>
+        </dependency>
+
+        <!-- OAuth2 Resource Server (for token validation) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
+        </dependency>
+
+        <!-- JWT parsing -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-oauth2-jose</artifactId>
+        </dependency>
+
+        <!-- MongoDB support -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-mongodb</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.mongodb</groupId>
+            <artifactId>mongodb-driver-sync</artifactId>
+        </dependency>
+        <!-- Lombok -->
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
             <scope>provided</scope>
         </dependency>
-
         <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter</artifactId>
-            <version>5.9.3</version>
-            <scope>test</scope>
+            <groupId>org.keycloak</groupId>
+            <artifactId>keycloak-admin-client</artifactId>
+            <version>24.0.1</version> <!-- Use same as your Keycloak -->
         </dependency>
 
-        <!-- Spring OpenAPI / Swagger -->
+        <!-- OpenAPI / Swagger -->
         <dependency>
             <groupId>org.springdoc</groupId>
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
@@ -82,22 +113,25 @@
             <version>${axon.version}</version>
         </dependency>
 
+        <!-- Axon Mongo Extension -->
+        <dependency>
+            <groupId>org.axonframework.extensions.mongo</groupId>
+            <artifactId>axon-mongo</artifactId>
+            <version>${axon.version}</version>
+        </dependency>
+
+        <!-- Axon Inspector (optionnel pour debug) -->
         <dependency>
             <groupId>io.axoniq.inspector</groupId>
             <artifactId>inspector-axon-spring-boot-starter</artifactId>
             <version>0.1.9</version>
         </dependency>
 
+        <!-- EventStoreDB Java Client -->
         <dependency>
             <groupId>com.eventstore</groupId>
             <artifactId>db-client-java</artifactId>
             <version>5.3.0</version>
-        </dependency>
-
-        <!-- MongoDB Support -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-data-mongodb</artifactId>
         </dependency>
 
         <!-- gRPC Dependencies -->
@@ -114,15 +148,12 @@
             <artifactId>grpc-stub</artifactId>
         </dependency>
 
-        <!-- Spring Boot Starter Test -->
+        <!-- Tests -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
-
-
-        <!-- Axon Test Support -->
         <dependency>
             <groupId>org.axonframework</groupId>
             <artifactId>axon-test</artifactId>
@@ -132,6 +163,13 @@
     </dependencies>
 
     <repositories>
+        <!-- Axon Extensions repo for axon-mongo -->
+        <repository>
+            <id>axon-extensions</id>
+            <url>https://oss.sonatype.org/content/repositories/releases</url>
+        </repository>
+
+        <!-- EventStoreDB Java client -->
         <repository>
             <id>github</id>
             <url>https://maven.pkg.github.com/EventStore/EventStore-Client-Java</url>
