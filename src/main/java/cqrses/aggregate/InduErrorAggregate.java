@@ -25,6 +25,7 @@ public class InduErrorAggregate {
 
     private Set<String> handledErrors = new HashSet<>();
     private Set<String> handledCompensations = new HashSet<>();
+
     @CommandHandler
     public InduErrorAggregate(CreateInduErrorCommand command) {
         apply(new InduGroupCreatedEvent(command.getUserId()));
@@ -44,18 +45,14 @@ public class InduErrorAggregate {
     public void handle(HandleInduErrorCommand command) {
         if (!handledErrors.contains(command.getInduErrorId())) {
             apply(new InduErrorHandledEvent(
+                    command.getUserId(),
                     command.getInduErrorId(),
                     InduErrorStatus.TRAITED
             ));
+            handledErrors.add(command.getInduErrorId());
         }
     }
-    @CommandHandler
-    public void handle(ProcessInduErrorsCommand command) {
-        apply(new InduErrorCurrentStateEvent(
-                command.getUserId(),
-                command.getTotalUntreatedAmount()
-        ));
-    }
+
     @CommandHandler
     public void handle(AddCompensationCommand command) {
         apply(new CompensationCreatedEvent(
@@ -65,23 +62,27 @@ public class InduErrorAggregate {
                 CompensationStatus.NOT_TRAITED
         ));
     }
+
     @CommandHandler
     public void handle(HandleCompensationCommand command) {
         if (!handledCompensations.contains(command.getCompensationId())) {
             apply(new CompensationHandledEvent(
+                    command.getUserId(),
                     command.getCompensationId(),
                     CompensationStatus.TRAITED
             ));
+            handledCompensations.add(command.getCompensationId());
         }
     }
-    @EventSourcingHandler
-    public void on(InduGroupCreatedEvent event) {
-        this.userId = event.getUserId();
+
+    @CommandHandler
+    public void handle(ProcessInduErrorsCommand command) {
+        apply(new InduErrorCurrentStateEvent(command.getUserId(), command.getTotalUntreatedAmount()));
     }
 
     @EventSourcingHandler
-    public void on(InduErrorCreatedEvent event) {
-        // Optional: handle creation
+    public void on(InduGroupCreatedEvent event) {
+        this.userId = event.getUserId();
     }
 
     @EventSourcingHandler
@@ -90,18 +91,7 @@ public class InduErrorAggregate {
     }
 
     @EventSourcingHandler
-    public void on(InduErrorCurrentStateEvent event) {
-        System.out.println("📊 Current untreated amount for group " + event.getUserId() + ": " + event.getTotalUntreatedAmount());
-        // Optionally, store the amount if needed
-    }
-
-    @EventSourcingHandler
-    public void on(CompensationCreatedEvent event) {
-        // Optionnel
-    }
-    @EventSourcingHandler
     public void on(CompensationHandledEvent event) {
         handledCompensations.add(event.getCompensationId());
-        System.out.println("✅ Compensation traitée : " + event.getCompensationId());
     }
 }

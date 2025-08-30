@@ -8,5 +8,6 @@ import lombok.*;
 @NoArgsConstructor
 public class InduErrorHandledEvent {
     private String induErrorId;
+    private String userId;
     private InduErrorStatus status;
 }

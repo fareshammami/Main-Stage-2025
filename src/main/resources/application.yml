@@ -43,8 +43,8 @@ axon:
 
   eventhandling:
     processors:
-      userInduState:           # 👈 Projection group name (matches @ProcessingGroup)
-        mode: tracking         # 👈 Required for Mongo-backed token store
+      userInduStateProjection:
+        mode: subscribing
         source: eventStore
 
   eventstore:

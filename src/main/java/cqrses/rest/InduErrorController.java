@@ -1,8 +1,9 @@
 package cqrses.rest;
 
-import cqrses.entity.EventFilter;
-import cqrses.service.InduErrorService;
 import cqrses.dto.StreamEventDTO;
+import cqrses.entity.EventFilter;
+import cqrses.projection.UserInduState;
+import cqrses.service.InduErrorService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -26,7 +27,7 @@ public class InduErrorController {
             induErrorService.initializeUser(userId);
             return ResponseEntity.ok("✅ Group initialized: " + userId);
         } catch (Exception e) {
-            e.printStackTrace(); // ✅ log for debug
+            e.printStackTrace();
             return ResponseEntity.status(400).body("❌ Erreur d'initialisation: " + e.getMessage());
         }
     }
@@ -36,7 +37,6 @@ public class InduErrorController {
         try {
             String userId = body.get("userId").toString();
             Double amount = Double.parseDouble(body.get("amount").toString());
-
             induErrorService.addInduError(userId, amount);
             return ResponseEntity.ok("✅ Error event added for user: " + userId);
         } catch (Exception e) {
@@ -50,7 +50,6 @@ public class InduErrorController {
         try {
             String userId = body.get("userId").toString();
             Double amount = Double.parseDouble(body.get("amount").toString());
-
             induErrorService.addCompensation(userId, amount);
             return ResponseEntity.ok("✅ Compensation event added for user: " + userId);
         } catch (Exception e) {
@@ -71,24 +70,39 @@ public class InduErrorController {
         }
     }
 
-    @GetMapping("/stream/{userId}")
-    public ResponseEntity<List<StreamEventDTO>> getStreamEvents(
+    @GetMapping("/projection/{userId}")
+    public ResponseEntity<List<StreamEventDTO>> getProjectionEvents(
             @PathVariable String userId,
             @RequestParam(defaultValue = "ALL") EventFilter filter,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(required = false) String eventType,
-            @RequestParam(required = false) String fromDate, // NEW
-            @RequestParam(required = false) String toDate    // NEW
+            @RequestParam(required = false) String fromDate,
+            @RequestParam(required = false) String toDate
     ) {
         try {
-            List<StreamEventDTO> events = induErrorService.getStreamEvents(userId, filter, page, size, eventType, fromDate, toDate);
+            List<StreamEventDTO> events = induErrorService.getProjectionEvents(userId, filter, page, size, eventType, fromDate, toDate);
             return ResponseEntity.ok(events);
         } catch (Exception e) {
+            e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
-
-
-
+    @GetMapping("/totals/{userId}")
+    public ResponseEntity<Map<String, Object>> getUserTotals(@PathVariable String userId) {
+        try {
+            UserInduState state = induErrorService.getUserState(userId);
+            Map<String, Object> totals = Map.of(
+                    "totalHandledInduErrors", state.getTotalHandledInduErrors(),
+                    "totalHandledCompensations", state.getTotalHandledCompensations(),
+                    "totalUntreatedInduErrors", state.getTotalUntreatedInduErrors(),
+                    "totalUntreatedCompensations", state.getTotalUntreatedCompensations(),
+                    "netTotal", state.getNetTotal()
+            );
+            return ResponseEntity.ok(totals);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
+        }
+    }
 }

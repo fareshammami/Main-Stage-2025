@@ -10,5 +10,6 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class CompensationHandledEvent {
     private String compensationId;
+    private String userId;
     private CompensationStatus status;
 }

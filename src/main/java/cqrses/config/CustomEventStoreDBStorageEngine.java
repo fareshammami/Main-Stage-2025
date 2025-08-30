@@ -1,113 +1,118 @@
-    package cqrses.config;
+package cqrses.config;
 
-    import com.eventstore.dbclient.*;
-    import com.eventstore.dbclient.EventData;
-    import cqrses.event.*;
-    import org.axonframework.eventhandling.*;
-    import org.axonframework.eventsourcing.eventstore.*;
-    import org.axonframework.serialization.SerializedObject;
-    import org.axonframework.serialization.Serializer;
-    import org.axonframework.serialization.SimpleSerializedObject;
-    import org.axonframework.serialization.SimpleSerializedType;
-    import org.axonframework.eventhandling.GenericDomainEventMessage;
-    import org.springframework.context.annotation.Bean;
-    import org.springframework.context.annotation.Primary;
-    import org.springframework.stereotype.Component;
+import com.eventstore.dbclient.*;
+import com.eventstore.dbclient.EventData;
+import org.axonframework.eventhandling.*;
+import org.axonframework.eventsourcing.eventstore.*;
+import org.axonframework.serialization.Serializer;
+import org.axonframework.serialization.SerializedObject;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.context.annotation.Primary;
+import org.springframework.stereotype.Component;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import cqrses.event.*;
 
-    import java.util.Comparator;
-    import java.util.List;
-    import java.util.concurrent.atomic.AtomicLong;
-    import java.util.stream.Collectors;
-    import java.util.stream.Stream;
-    @Primary
-    @Component
+import java.util.*;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
-    public class CustomEventStoreDBStorageEngine extends AbstractEventStorageEngine {
+@Primary
+@Component
+public class CustomEventStoreDBStorageEngine extends AbstractEventStorageEngine {
 
-        private final EventStoreDBClient client;
-        private final Serializer serializer;
+    private final EventStoreDBClient client;
+    private final Serializer serializer;
+    private final ObjectMapper objectMapper;
 
-        public CustomEventStoreDBStorageEngine(EventStoreDBClient client, Serializer serializer) {
-            super(new AbstractEventStorageEngine.Builder() {});
-            this.client = client;
-            this.serializer = serializer;
+    // Map of event type names to classes for deserialization
+    private static final Map<String, Class<?>> EVENT_TYPE_MAP = Map.of(
+            "InduErrorCreatedEvent", InduErrorCreatedEvent.class,
+            "InduErrorHandledEvent", InduErrorHandledEvent.class,
+            "InduCreatedEvent", InduCreatedEvent.class,
+            "InduGroupCreatedEvent", InduGroupCreatedEvent.class,
+            "InduErrorCurrentStateEvent", InduErrorCurrentStateEvent.class,
+            "CompensationCreatedEvent", CompensationCreatedEvent.class,
+            "CompensationHandledEvent", CompensationHandledEvent.class
+    );
+
+    public CustomEventStoreDBStorageEngine(
+            EventStoreDBClient client,
+            @Qualifier("axonSerializer") Serializer serializer,
+            ObjectMapper objectMapper
+    ) {
+        super(new AbstractEventStorageEngine.Builder() {});
+        this.client = client;
+        this.serializer = serializer;
+        this.objectMapper = objectMapper;
+    }
+
+    private String getStreamName(String aggregateId) {
+        return "EventAggregate-" + aggregateId;
+    }
+
+    @Override
+    protected void appendEvents(List<? extends EventMessage<?>> events, Serializer ignored) {
+        for (EventMessage<?> event : events) {
+            if (event instanceof DomainEventMessage<?> domainEvent) {
+                SerializedObject<byte[]> serializedPayload = serializer.serialize(domainEvent.getPayload(), byte[].class);
+                SerializedObject<byte[]> serializedMetadata = serializer.serialize(domainEvent.getMetaData(), byte[].class);
+
+                String streamName = getStreamName(domainEvent.getAggregateIdentifier());
+
+                EventData eventData = EventData.builderAsJson(
+                        domainEvent.getPayloadType().getSimpleName(),
+                        serializedPayload.getData()
+                ).metadataAsBytes(serializedMetadata.getData()).build();
+
+                client.appendToStream(streamName, eventData).join();
+
+                System.out.println("📥 Written event to stream " + streamName + ": " + domainEvent.getPayloadType().getSimpleName());
+            }
+        }
+    }
+
+    @Override
+    public DomainEventStream readEvents(String aggregateIdentifier) {
+        String streamName = getStreamName(aggregateIdentifier);
+        ReadResult result;
+        try {
+            result = client.readStream(streamName, ReadStreamOptions.get().forwards().fromStart()).join();
+        } catch (Exception e) {
+            return DomainEventStream.of(Stream.empty());
         }
 
-        private String getStreamName(String aggregateId) {
-            return "EventAggregate-" + aggregateId;
-        }
+        AtomicLong sequence = new AtomicLong(0);
 
-        @Override
-        protected void appendEvents(List<? extends EventMessage<?>> events, Serializer ignored) {
-            events.forEach(event -> {
-                if (event instanceof DomainEventMessage<?> domainEvent) {
-                    // Sérialisation correcte en byte[]
-                    SerializedObject<byte[]> serializedPayload = this.serializer.serialize(domainEvent.getPayload(), byte[].class);
-                    SerializedObject<byte[]> serializedMetadata = this.serializer.serialize(domainEvent.getMetaData(), byte[].class);
+        return DomainEventStream.of(
+                result.getEvents().stream().map(resolved -> {
+                    RecordedEvent re = resolved.getEvent();
+                    Class<?> eventClass = EVENT_TYPE_MAP.get(re.getEventType());
+                    if (eventClass == null) {
+                        throw new RuntimeException("Unknown event type: " + re.getEventType());
+                    }
 
-                    String streamName = getStreamName(domainEvent.getAggregateIdentifier());
+                    try {
+                        Object payload = objectMapper.readValue(re.getEventData(), eventClass);
 
-                    System.out.println("📥 Writing to stream: " + streamName);
-                    System.out.println("📦 Event type: " + domainEvent.getPayloadType().getSimpleName());
+                        return new GenericDomainEventMessage<>(
+                                re.getEventType(),
+                                aggregateIdentifier,
+                                sequence.getAndIncrement(),
+                                payload
+                        );
+                    } catch (Exception ex) {
+                        throw new RuntimeException("Failed to deserialize event: " + re.getEventType(), ex);
+                    }
+                })
+        );
+    }
 
-                    EventData eventData = EventData.builderAsJson(
-                            domainEvent.getPayloadType().getSimpleName(),
-                            serializedPayload.getData()
-                    ).metadataAsBytes(serializedMetadata.getData()).build();
-
-                    client.appendToStream(streamName, eventData).join();
-                }
-            });
-        }
-
-        @Override
-        public DomainEventStream readEvents(String aggregateIdentifier) {
-            String streamName = getStreamName(aggregateIdentifier);
-            System.out.println("📤 Reading stream: " + streamName);
-
-            ReadResult result = client.readStream(streamName, ReadStreamOptions.get().forwards().fromStart()).join();
-            AtomicLong sequence = new AtomicLong(0);
-
-            return DomainEventStream.of(result.getEvents().stream().map(resolved -> {
-                RecordedEvent re = resolved.getEvent();
-
-                System.out.println("✅ Event found: " + re.getEventType());
-
-                Class<?> eventClass = switch (re.getEventType()) {
-                    case "InduErrorCreatedEvent" -> InduErrorCreatedEvent.class;
-                    case "InduErrorHandledEvent" -> InduErrorHandledEvent.class;
-                    case "InduCreatedEvent" -> InduCreatedEvent.class;
-                    case "InduGroupCreatedEvent" -> InduGroupCreatedEvent.class;
-                    case "InduErrorCurrentStateEvent" -> InduErrorCurrentStateEvent.class;
-                    case "CompensationCreatedEvent" -> CompensationCreatedEvent.class;
-                    case "CompensationHandledEvent" -> CompensationHandledEvent.class;
-                    default -> throw new RuntimeException("Unknown event: " + re.getEventType());
-                };
-
-                SerializedObject<byte[]> serializedObject = new SimpleSerializedObject<>(
-                        re.getEventData(),
-                        byte[].class,
-                        new SimpleSerializedType(eventClass.getName(), null)
-                );
-
-                Object payload = serializer.deserialize(serializedObject);
-
-                return new GenericDomainEventMessage<>(
-                        re.getEventType(),              // type
-                        aggregateIdentifier,           // aggregate ID
-                        sequence.getAndIncrement(),    // sequence
-                        payload                        // payload
-                );
-            }));
-        }
-
-
-
-
-        @Override
-        protected void storeSnapshot(DomainEventMessage<?> snapshot, Serializer serializer) {
-            String jsonPayload = serializer.serialize(snapshot.getPayload(), String.class).getData();
-            String jsonMetadata = serializer.serialize(snapshot.getMetaData(), String.class).getData();
+    @Override
+    protected void storeSnapshot(DomainEventMessage<?> snapshot, Serializer ignored) {
+        try {
+            String jsonPayload = objectMapper.writeValueAsString(snapshot.getPayload());
+            String jsonMetadata = objectMapper.writeValueAsString(snapshot.getMetaData());
 
             EventData eventData = EventData.builderAsJson(
                     snapshot.getPayloadType().getSimpleName(),
@@ -116,39 +121,36 @@
 
             String streamName = getStreamName(snapshot.getAggregateIdentifier()) + "-snapshot";
             client.appendToStream(streamName, eventData).join();
-        }
-        public Double getLastInduErrorAmount(String userId) {
-            try {
-                // Read all events for the given user (aggregate)
-                List<InduErrorCurrentStateEvent> events = this.readEvents(userId).asStream()
-                        .map(eventMessage -> eventMessage.getPayload()) // payload is the actual event object
-                        .filter(payload -> payload instanceof InduErrorCurrentStateEvent)
-                        .map(payload -> (InduErrorCurrentStateEvent) payload)
-                        .collect(Collectors.toList());
 
-                if (!events.isEmpty()) {
-                    // Take the last event in the list
-                    return events.get(events.size() - 1).getTotalUntreatedAmount();
-                }
-                return null; // no events, return null
-            } catch (Exception e) {
-                // Any error while reading events, just return null
-                System.err.println("Failed to read events for user " + userId + ": " + e.getMessage());
-                return null;
-            }
-        }
-        @Override
-        protected Stream<? extends DomainEventData<?>> readEventData(String aggregateIdentifier, long firstSequenceNumber) {
-            return Stream.empty();
-        }
-
-        @Override
-        protected Stream<? extends TrackedEventData<?>> readEventData(TrackingToken trackingToken, boolean mayBlock) {
-            return Stream.empty();
-        }
-
-        @Override
-        protected Stream<? extends DomainEventData<?>> readSnapshotData(String aggregateIdentifier) {
-            return Stream.empty();
+            System.out.println("💾 Stored snapshot for " + snapshot.getAggregateIdentifier());
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to store snapshot for " + snapshot.getAggregateIdentifier(), e);
         }
     }
+
+    @Override
+    protected Stream<? extends DomainEventData<?>> readEventData(String aggregateIdentifier, long firstSequenceNumber) {
+        return Stream.empty();
+    }
+
+    @Override
+    protected Stream<? extends TrackedEventData<?>> readEventData(TrackingToken trackingToken, boolean mayBlock) {
+        return Stream.empty();
+    }
+
+    @Override
+    protected Stream<? extends DomainEventData<?>> readSnapshotData(String aggregateIdentifier) {
+        return Stream.empty();
+    }
+
+    // Convenience method for your business logic
+    public Double getLastInduErrorAmount(String userId) {
+        return this.readEvents(userId).asStream()
+                .map(EventMessage::getPayload)
+                .filter(InduErrorCurrentStateEvent.class::isInstance)
+                .map(InduErrorCurrentStateEvent.class::cast)
+                .reduce((first, second) -> second)
+                .map(InduErrorCurrentStateEvent::getTotalUntreatedAmount)
+                .orElse(null);
+    }
+}

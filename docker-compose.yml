@@ -12,6 +12,7 @@ services:
       - 8124:8124
   eventstore.db:
     image: eventstore/eventstore:21.2.0-buster-slim
+    container_name: eventstore.db
     environment:
       - EVENTSTORE_CLUSTER_SIZE=1
       - EVENTSTORE_RUN_PROJECTIONS=System
@@ -21,9 +22,14 @@ services:
       - EVENTSTORE_INSECURE=true
       - EVENTSTORE_ENABLE_EXTERNAL_TCP=true
       - EVENTSTORE_ENABLE_ATOM_PUB_OVER_HTTP=true
+      - EVENTSTORE_DB=/var/lib/eventstore
     ports:
       - "1113:1113"
       - "2113:2113"
+    volumes:
+      - eventstore_data:/var/lib/eventstore
+    networks:
+      - backend
   mongodb:
     image: mongo
     container_name: dewdrop-mongodb
@@ -71,6 +77,7 @@ services:
 volumes:
   mongodb_data:
   postgres_data:
+  eventstore_data:
 
 networks:
   backend:

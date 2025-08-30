@@ -15,9 +15,12 @@ public class JacksonConfig {
         return new ObjectMapper();
     }
 
+    // Primary Axon serializer
     @Bean
     @Primary
     public Serializer axonSerializer(ObjectMapper objectMapper) {
-        return JacksonSerializer.builder().objectMapper(objectMapper).build();
+        return JacksonSerializer.builder()
+                .objectMapper(objectMapper)
+                .build();
     }
 }
